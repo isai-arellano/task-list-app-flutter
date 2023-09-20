@@ -1,5 +1,6 @@
 import 'package:curso_flutter/app/ui/components/h1_title.dart';
 import 'package:curso_flutter/app/ui/components/shape.dart';
+import 'package:curso_flutter/app/ui/home/inherited_widgets.dart';
 import 'package:curso_flutter/app/ui/task_list/task_list_view.dart';
 import 'package:flutter/material.dart';
 

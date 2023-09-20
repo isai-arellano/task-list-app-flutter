@@ -2,59 +2,35 @@ import 'package:curso_flutter/app/models/task.dart';
 import 'package:curso_flutter/app/repository/task_repository.dart';
 import 'package:curso_flutter/app/ui/components/h1_title.dart';
 import 'package:curso_flutter/app/ui/components/shape.dart';
+import 'package:curso_flutter/app/ui/task_list/task_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class TaskListView extends StatefulWidget {
+class TaskListView extends StatelessWidget {
   const TaskListView({super.key});
 
   @override
-  State<TaskListView> createState() => _TaskListViewState();
-}
-
-class _TaskListViewState extends State<TaskListView> {
-  final TaskRepository taskRepository = TaskRepository();
-
-  @override
   Widget build(BuildContext context) {
-    return  Scaffold(
-       body:  Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _HeaderTasksView(),
-          Expanded(
-            child: FutureBuilder<List<Task>>(
-              future: taskRepository.getTasks(),
-              builder: (context, snapShot) {
-                if(snapShot.connectionState == ConnectionState.waiting){
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                    );
-                }
-                if(!snapShot.hasData || snapShot.data!.isEmpty){
-                  return const Center(
-                    child: Text('No existen tareas'),
-                  );
-                }
-                return _TaskListView(
-                snapShot.data!, 
-                onTaskDoneChange: (task){
-                  task.done = !task.done;
-                  taskRepository.saveTasks(snapShot.data!);
-                  setState(() {
-
-                  });
-                }
-                );
-              }
+    return  ChangeNotifierProvider(
+      create: (_)=> TaskProvider()..fetchTasks(),
+      child: Scaffold(
+         body:  const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _HeaderTasksView(),
+            Expanded(
+              child: _TaskListView(),
             ),
-          ),
-        ],
-       ),
-       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showNewTaskModal(context),
-        child: const Icon(Icons.add, size: 50,),
-       ),
+          ],
+         ),
+         floatingActionButton: Builder(
+          builder: (context) => FloatingActionButton(
+            onPressed: () => _showNewTaskModal(context),
+            child: const Icon(Icons.add, size: 50,),
+           ),
+         ),
+      ),
     );
   }
 
@@ -62,11 +38,10 @@ class _TaskListViewState extends State<TaskListView> {
   showModalBottomSheet(
     context: context, 
     isScrollControlled: true,
-    builder: (_) => _NewTaskModal(
-      onTaskCreated: (Task task) {
-        taskRepository.addTask(task);
-      setState(() { });
-    })
+    builder: (_) => ChangeNotifierProvider.value(
+      value: context.read<TaskProvider>(),
+      child: _NewTaskModal(),
+    )
   );
   }
 
@@ -75,10 +50,9 @@ class _TaskListViewState extends State<TaskListView> {
 
 
 class _NewTaskModal extends StatelessWidget {
-  _NewTaskModal({super.key, required this.onTaskCreated});
+  _NewTaskModal({super.key});
 
   final _controller = TextEditingController();
-  final void Function(Task task) onTaskCreated;
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +87,7 @@ class _NewTaskModal extends StatelessWidget {
             onPressed: (){
               if (_controller.text.isNotEmpty){
                 final task = Task(_controller.text);
-                onTaskCreated(task);
+                context.read<TaskProvider>().addNewTask(task);
                 Navigator.of(context).pop();
               }
             }, 
@@ -184,10 +158,7 @@ class _HeaderTasksView extends StatelessWidget {
 }
 
 class _TaskListView extends StatelessWidget {
-  const _TaskListView(this.taskList,{super.key, required this.onTaskDoneChange});
-
-  final List<Task> taskList;
-  final void Function(Task task) onTaskDoneChange;
+  const _TaskListView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -198,13 +169,22 @@ class _TaskListView extends StatelessWidget {
         children: [
           const H1Title('Tareas'),
           Expanded(
-            child: ListView.separated(
-              itemCount: taskList.length,
+            child: Consumer<TaskProvider>(
+              builder: (_,provider, __){
+                if (provider.taskList.isEmpty){
+                  return const Center(
+                    child: Text('No hay tareas'),
+                  );
+                }
+                return  ListView.separated(
+              itemCount: provider.taskList.length,
               separatorBuilder: (_, __) => const SizedBox(height: 16),
-              itemBuilder: (_, index) => _TaskItem(taskList[index], 
-              onTap: () => onTaskDoneChange(taskList[index]),
+              itemBuilder: (_, index) => _TaskItem(provider.taskList[index], 
+              onTap: () => provider.onTaskDoneChange(provider.taskList[index]),
               ),  
-              ),
+              );
+              },
+            ),
           ),
         ],
       ),
